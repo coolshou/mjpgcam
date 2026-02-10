@@ -2,6 +2,9 @@ QT += core gui
 QT += network
 # QT += openglwidgets
 
+# for Windows qDebug()
+CONFIG += console
+
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 CONFIG += c++17
