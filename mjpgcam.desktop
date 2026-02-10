@@ -1,0 +1,13 @@
+[Desktop Entry]
+Encoding=UTF-8
+Version=1.0
+Name=mjpgcam
+Comment=http mjpg webcam viewer
+Type=Application
+Exec=/opt/mjpgcam/bin/mjpgcam
+Icon=mjpgcam
+Terminal=false
+X-GNOME-WMName=mjpgcam
+Categories=Network;Qt;
+StartupNotify=true
+StartupWMClass=mjpgcam
