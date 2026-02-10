@@ -308,5 +308,5 @@ void MJPEGStreamer::on_readyRead()
 
 void MJPEGStreamer::on_errorOccurred(QAbstractSocket::SocketError err)
 {
-    emit error("SocketError:("+ QString::number(err)+")"+ socketErrorToString(err));
+    emit error("SocketError:("+ QString::number(err)+")"+ m_socket->errorString());
 }
