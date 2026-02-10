@@ -40,7 +40,7 @@ RESOURCES += \
     mjpgcam.qrc
 
 win32 {
-    RC_ICONS = images/mjpegcam.ico
+    RC_ICONS = images/mjpgcam.ico
     DEPLOY_COMMAND += $$shell_quote($$shell_path($$[QT_INSTALL_BINS]\windeployqt))
     DEPLOY_TARGET_EXE = $$shell_quote($$shell_path($${OUT_PWD}/release/$${TARGET}.exe))
     DEPLOY_TARGET = $$shell_quote($$shell_path($${OUT_PWD}/release/$${TARGET}-$${VERSION}))
@@ -48,4 +48,12 @@ win32 {
     QMAKE_POST_LINK += $$quote(cmd /c copy /y $${DEPLOY_TARGET_EXE} "$${DEPLOY_TARGET}\\" $$escape_expand(\\n\\t))
     QMAKE_POST_LINK += $$quote(cmd /c $${DEPLOY_COMMAND} $${DEPLOY_TARGET}\\$${TARGET}.exe $$escape_expand(\\n\\t))
 
+}
+unix {
+    desktop.files  = mjpgcam.desktop
+    desktop.path   = /usr/share/applications/
+    INSTALLS       += desktop
+    images.files = images/mjpgcam.png
+    images.path   = /usr/share/pixmaps/
+    INSTALLS       += images
 }
