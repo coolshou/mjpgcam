@@ -205,7 +205,8 @@ void MJPEGStreamer::on_connected()
                                   "Connection: keep-alive\r\n\r\n").arg(
             m_url.path() + "?" + m_url.query(), m_url.host(), QString(m_url.userName() + ":" + m_url.password()).toUtf8().toBase64()
         );
-        m_socket->write(request.toStdString().c_str());
+        // m_socket->write(request.toStdString().c_str());
+        m_socket->write(request.toUtf8());
     }
     break;
     case StreamState::Authorizing:{
