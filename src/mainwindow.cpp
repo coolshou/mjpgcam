@@ -54,8 +54,11 @@ void MainWindow::onStart()
         url = url + sPath;
     }
     onUpdateMsg("Connect to " + url);
+#ifdef Q_OS_WIN
+    m_stream->set_url(url, iPort);
+#else
     m_stream->set_url(url);
-
+#endif
     m_stream->start();
 }
 

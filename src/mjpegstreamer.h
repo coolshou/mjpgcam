@@ -17,7 +17,7 @@ public:
     ~MJPEGStreamer();
     void start();
     void stop();
-    void set_url(const QString &url);
+    void set_url(const QString &url, int port=80);
     QString url();
 private:
     QTcpSocket * m_socket;

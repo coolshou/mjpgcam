@@ -43,10 +43,18 @@ void MJPEGStreamer::stop()
     emit disconnected();
 }
 
-void MJPEGStreamer::set_url(const QString &url)
+void MJPEGStreamer::set_url(const QString &url, int port)
 {
     m_url = QUrl(url, QUrl::TolerantMode);
+#ifdef Q_OS_WIN
+    //# under Windows the Port will not set by url's port
+    m_url.setPort(port);
+#else
+    Q_UNUSED(port)
+#endif
     qDebug() << "m_url port:" << QString::number(m_url.port());
+    qDebug() << "m_url userName:" << m_url.userName();
+    qDebug() << "m_url password:" << m_url.password();
 }
 
 QString MJPEGStreamer::url()
