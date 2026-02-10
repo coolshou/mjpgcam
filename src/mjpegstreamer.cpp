@@ -46,6 +46,7 @@ void MJPEGStreamer::stop()
 void MJPEGStreamer::set_url(const QString &url)
 {
     m_url = QUrl(url, QUrl::TolerantMode);
+    qDebug() << "m_url port:" << QString::number(m_url.port());
 }
 
 QString MJPEGStreamer::url()
