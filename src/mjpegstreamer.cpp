@@ -1,0 +1,302 @@
+#include "mjpegstreamer.h"
+
+#include <QBuffer>
+#include <QImageReader>
+#include <QCryptographicHash>
+#include <QRandomGenerator>
+
+MJPEGStreamer::MJPEGStreamer(QWidget * parent)
+{
+    setParent(parent);
+    setScaledContents(true);
+    setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
+
+    m_state = StreamState::Stopped;
+    m_socket = new QTcpSocket(this);
+#ifdef Q_OS_LINUX
+    m_socket->open(QIODevice::ReadWrite);
+#endif
+    connect(m_socket, &QTcpSocket::connected, this, &MJPEGStreamer::on_connected);
+    connect(m_socket, &QTcpSocket::disconnected, this, &MJPEGStreamer::on_disconnected);
+    connect(m_socket, &QTcpSocket::readyRead, this, &MJPEGStreamer::on_readyRead);
+    connect(m_socket, &QTcpSocket::errorOccurred, this, &MJPEGStreamer::on_errorOccurred);
+
+    clearVideoSurface();
+
+}
+
+MJPEGStreamer::~MJPEGStreamer()
+{
+    m_socket->close();
+    delete m_socket;
+}
+
+void MJPEGStreamer::start()
+{
+    m_socket->connectToHost(m_url.host(), m_url.port(80));
+}
+
+void MJPEGStreamer::stop()
+{
+    m_socket->disconnectFromHost();
+    m_state = StreamState::Stopped;
+    emit disconnected();
+}
+
+void MJPEGStreamer::set_url(const QString &url)
+{
+    m_url = QUrl(url, QUrl::TolerantMode);
+}
+
+QString MJPEGStreamer::url()
+{
+    return m_url.toString();
+}
+
+QString MJPEGStreamer::generate_auth_digest(const QString &resp_unauthorized)
+{
+    int ind_wwwauth_line_first_byte = resp_unauthorized.indexOf("WWW-Authenticate");
+    if(ind_wwwauth_line_first_byte > -1) {
+        // excluding everything before WWW-Authenticate
+        QString temp = resp_unauthorized.mid(ind_wwwauth_line_first_byte);
+        int ind_of_crlf = temp.indexOf("\r\n");
+        // excluding everything after WWW-Authentic...opaque="" (excluding \r\n too)
+        QString digest_line = temp.mid(0, ind_of_crlf);
+        // excluding "WWW-Authenticate: Digest "
+        QString digest_content = digest_line.mid(25);
+        // splitting comma separated sentences as a="b", c="d" into new strings to store them in map_pieces
+        QStringList auth_line_pieces = digest_content.split(',');
+        QMap <QString, QString> map_pieces;
+
+        for(int i = 0; i < auth_line_pieces.size(); i++) {
+            QString piece = auth_line_pieces[i];
+            // we need to get rid of double quotes as are not needed in calculations
+            piece.remove("\"");
+            // we also need to remove useless spaces at the start of each sentence such as ' a="b"' to 'a="b"'
+            if(piece.at(0) == ' ') {
+                piece.remove(0, 1);
+            }
+            map_pieces.insert(piece.left(piece.indexOf('=')), piece.mid(piece.indexOf('=') + 1));
+        }
+
+        QString ha1 = QString::fromUtf8(QCryptographicHash::hash(QString("%1:%2:%3").arg(
+            m_url.userName(), map_pieces["realm"], m_url.password()
+        ).toUtf8(),QCryptographicHash::Md5).toHex());
+
+        QString ha2 = QString::fromUtf8(QCryptographicHash::hash(QString("%1:%2").arg(
+            "GET", m_url.path() + "?" + m_url.query()
+        ).toUtf8(),QCryptographicHash::Md5).toHex());
+
+        // struct timespec ts;
+        // clock_gettime(CLOCK_MONOTONIC, &ts);
+        // srand((time_t)ts.tv_nsec);
+
+        // QString nc = QString::number(rand()%100000000);
+        QString nc = QString::number(QRandomGenerator::global()->bounded(100000000));
+        QString cnonce = QString("%1%2%3").arg(map_pieces["nonce"], "benden selam olsun bolu beyine", QString::number(time(nullptr))).toUtf8().toBase64().toHex();
+
+        QString response = QString::fromUtf8(QCryptographicHash::hash(QString("%1:%2:%3:%4:%5:%6").arg(
+            ha1, map_pieces["nonce"], nc, cnonce, map_pieces["qop"], ha2).toUtf8(), QCryptographicHash::Md5).toHex()
+        );
+        QString digest_header = QString("Digest username=\"%1\", realm=\"%2\", nonce=\"%3\", uri=\"%4\", response=\"%5\", qop=%6, nc=%7, cnonce=\"%8\"").arg(
+            m_url.userName(), map_pieces["realm"], map_pieces["nonce"], m_url.path() + "?" + m_url.query(), response, map_pieces["qop"], nc, cnonce
+        );
+        return QString("GET %1 HTTP/1.1\r\n"
+                       "Host: %2\r\n"
+                       "Authorization: %3\r\n"
+                       "Upgrade-Insecure-Requests: 1\r\n"
+                       "Accept: */*\r\n"
+                       "Connection: keep-alive\r\n\r\n").arg(m_url.path() + "?" + m_url.query(), m_url.host(), digest_header);
+    }
+    return "";
+}
+
+QString MJPEGStreamer::socketErrorToString(QAbstractSocket::SocketError error)
+{
+    switch (error) {
+    case QAbstractSocket::ConnectionRefusedError:
+        return "Connection refused";
+    case QAbstractSocket::RemoteHostClosedError:
+        return "Remote host closed the connection";
+    case QAbstractSocket::HostNotFoundError:
+        return "Host not found";
+    case QAbstractSocket::SocketAccessError:
+        return "Socket access error";
+    case QAbstractSocket::SocketResourceError:
+        return "Socket resource error";
+    case QAbstractSocket::SocketTimeoutError:
+        return "Socket timeout";
+    case QAbstractSocket::DatagramTooLargeError:
+        return "Datagram too large";
+    case QAbstractSocket::NetworkError:
+        return "Network error";
+    case QAbstractSocket::AddressInUseError:
+        return "Address already in use";
+    case QAbstractSocket::SocketAddressNotAvailableError:
+        return "Socket address not available";
+    case QAbstractSocket::UnsupportedSocketOperationError:
+        return "Unsupported socket operation";
+    case QAbstractSocket::UnfinishedSocketOperationError:
+        return "Unfinished socket operation";
+    case QAbstractSocket::ProxyAuthenticationRequiredError:
+        return "Proxy authentication required";
+    case QAbstractSocket::SslHandshakeFailedError:
+        return "SSL handshake failed";
+    case QAbstractSocket::ProxyConnectionRefusedError:
+        return "Proxy connection refused";
+    case QAbstractSocket::ProxyConnectionClosedError:
+        return "Proxy connection closed";
+    case QAbstractSocket::ProxyConnectionTimeoutError:
+        return "Proxy connection timeout";
+    case QAbstractSocket::ProxyNotFoundError:
+        return "Proxy not found";
+    case QAbstractSocket::ProxyProtocolError:
+        return "Proxy protocol error";
+    case QAbstractSocket::OperationError:
+        return "Operation error";
+    case QAbstractSocket::SslInternalError:
+        return "SSL internal error";
+    case QAbstractSocket::SslInvalidUserDataError:
+        return "SSL invalid user data";
+    case QAbstractSocket::TemporaryError:
+        return "Temporary error";
+    case QAbstractSocket::UnknownSocketError:
+    default:
+        return "Unknown socket error";
+    }
+}
+
+void MJPEGStreamer::clearVideoSurface()
+{
+    /** clear video surface */
+    {
+        QPixmap pmap(width(), height());
+        pmap.fill(Qt::black);
+        setPixmap(pmap);
+    }
+}
+
+void MJPEGStreamer::on_connected()
+{
+    qDebug() << "connected.";
+    switch (m_state) {
+    case StreamState::Stopped:{
+        /**
+         * this is the default case when the streamer
+         * connects to the server.
+         *
+         * if basic authentication is sufficient for the server
+         * it will return status 200 and the stream will start.
+         * (m_state will be set to StreamState::Streaming)
+         *
+         * if the server challenges
+         * us with some extra authentication (401 unauthorized
+         * with digest in this case) socket
+         * connection will be closed by the server after
+         * 401 response. this is where we need to reconnect
+         * and ask for authorization for the second time with
+         * our authentication digest.
+         */
+        QString request = QString("GET %1 HTTP/1.1\r\n"
+                                  "Host: %2\r\n"
+                                  "Authorization: Basic %3\r\n"
+                                  "Accept: */*\r\n"
+                                  "Upgrade-Insecure-Requests: 1\r\n"
+                                  "Connection: keep-alive\r\n\r\n").arg(
+            m_url.path() + "?" + m_url.query(), m_url.host(), QString(m_url.userName() + ":" + m_url.password()).toUtf8().toBase64()
+        );
+        m_socket->write(request.toStdString().c_str());
+    }
+    break;
+    case StreamState::Authorizing:{
+        QString buffer_str = QString::fromUtf8(m_buffer);
+        QString request_with_digest;
+        if(!(request_with_digest = generate_auth_digest(buffer_str)).isEmpty()) {
+            m_socket->write(request_with_digest.toUtf8());
+        }
+    }
+    break;
+        default:
+        break;
+    }
+}
+
+void MJPEGStreamer::on_disconnected()
+{
+    qDebug() << "disconnected.";
+    clearVideoSurface();
+
+    if(m_state == StreamState::Authorizing) {
+        /** this means we got rejected by server once,
+         * now we will try to reconnect with a stronger
+         * authentication challenge.
+         */
+        start();
+    }
+    else {
+        m_buffer.clear();
+    }
+}
+
+void MJPEGStreamer::on_readyRead()
+{
+    m_buffer += m_socket->readAll();
+    QString sbuffer = QString::fromUtf8(m_buffer);
+
+    switch (m_state) {
+    case StreamState::Stopped: {
+        if(sbuffer.contains("401")) {
+            /** we switch to authorization state so we can
+             * try one more time with digest authentication.
+             * see: on_disconnected()
+             */
+            m_state = StreamState::Authorizing;
+        }
+        else if(sbuffer.contains("200")) {
+            m_state = StreamState::Streaming;
+        }else{
+            qDebug() << "StreamState::Stopped sbuffer:" << sbuffer;
+        }
+    }
+    break;
+    case StreamState::Authorizing:
+        if(sbuffer.contains("200")) {
+            m_state = StreamState::Streaming;
+        }
+        else if(sbuffer.contains("401")) {
+            /** if we get rejected in Stopped state we try one more time,
+             * if we get rejected in Authorizing state, we give up. */
+            stop();
+        }else{
+            qDebug() << "StreamState::Authorizing sbuffer:" << sbuffer;
+        }
+    break;
+    case StreamState::Streaming: {
+        while (true) {
+            int start = m_buffer.indexOf("\xff\xd8"); // SOI
+            if (start < 0) break;
+
+            int end = m_buffer.indexOf("\xff\xd9", start + 2); // EOI
+            if (end < 0) break;
+
+            QByteArray image_data = m_buffer.mid(start, end - start + 2);
+            m_buffer.remove(0, end + 2);
+
+            QPixmap pmap;
+            if (pmap.loadFromData(image_data, "JPEG")) {
+                setPixmap(pmap.scaled(size(), Qt::KeepAspectRatio));
+            } else {
+                qDebug() << "error: bad JPEG data. Supported formats:" << QImageReader::supportedImageFormats();
+            }
+        }
+    }
+    break;
+    default:
+    break;
+    }
+}
+
+void MJPEGStreamer::on_errorOccurred(QAbstractSocket::SocketError err)
+{
+    emit error("SocketError:("+ QString::number(err)+")"+ socketErrorToString(err));
+}
