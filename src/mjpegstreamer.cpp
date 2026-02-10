@@ -12,6 +12,7 @@ MJPEGStreamer::MJPEGStreamer(QWidget * parent)
     setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
 
     m_state = StreamState::Stopped;
+    //QTcpSocket can not work under http proxy!! check proxy setting
     m_socket = new QTcpSocket(this);
 #ifdef Q_OS_LINUX
     m_socket->open(QIODevice::ReadWrite);
