@@ -31,7 +31,6 @@ signals:
 private:
     void stream_mjpeg();
     QString generate_auth_digest(const QString &response);
-    QString socketErrorToString(QAbstractSocket::SocketError error);
     void clearVideoSurface();
 private slots:
     void on_connected();

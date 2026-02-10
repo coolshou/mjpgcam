@@ -120,61 +120,6 @@ QString MJPEGStreamer::generate_auth_digest(const QString &resp_unauthorized)
     return "";
 }
 
-QString MJPEGStreamer::socketErrorToString(QAbstractSocket::SocketError error)
-{
-    switch (error) {
-    case QAbstractSocket::ConnectionRefusedError:
-        return "Connection refused";
-    case QAbstractSocket::RemoteHostClosedError:
-        return "Remote host closed the connection";
-    case QAbstractSocket::HostNotFoundError:
-        return "Host not found";
-    case QAbstractSocket::SocketAccessError:
-        return "Socket access error";
-    case QAbstractSocket::SocketResourceError:
-        return "Socket resource error";
-    case QAbstractSocket::SocketTimeoutError:
-        return "Socket timeout";
-    case QAbstractSocket::DatagramTooLargeError:
-        return "Datagram too large";
-    case QAbstractSocket::NetworkError:
-        return "Network error";
-    case QAbstractSocket::AddressInUseError:
-        return "Address already in use";
-    case QAbstractSocket::SocketAddressNotAvailableError:
-        return "Socket address not available";
-    case QAbstractSocket::UnsupportedSocketOperationError:
-        return "Unsupported socket operation";
-    case QAbstractSocket::UnfinishedSocketOperationError:
-        return "Unfinished socket operation";
-    case QAbstractSocket::ProxyAuthenticationRequiredError:
-        return "Proxy authentication required";
-    case QAbstractSocket::SslHandshakeFailedError:
-        return "SSL handshake failed";
-    case QAbstractSocket::ProxyConnectionRefusedError:
-        return "Proxy connection refused";
-    case QAbstractSocket::ProxyConnectionClosedError:
-        return "Proxy connection closed";
-    case QAbstractSocket::ProxyConnectionTimeoutError:
-        return "Proxy connection timeout";
-    case QAbstractSocket::ProxyNotFoundError:
-        return "Proxy not found";
-    case QAbstractSocket::ProxyProtocolError:
-        return "Proxy protocol error";
-    case QAbstractSocket::OperationError:
-        return "Operation error";
-    case QAbstractSocket::SslInternalError:
-        return "SSL internal error";
-    case QAbstractSocket::SslInvalidUserDataError:
-        return "SSL invalid user data";
-    case QAbstractSocket::TemporaryError:
-        return "Temporary error";
-    case QAbstractSocket::UnknownSocketError:
-    default:
-        return "Unknown socket error";
-    }
-}
-
 void MJPEGStreamer::clearVideoSurface()
 {
     /** clear video surface */
